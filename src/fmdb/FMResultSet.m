@@ -115,7 +115,7 @@
         return FMDBReturnAutoreleased([dict copy]);
     }
     else {
-        NSLog(@"Warning: There seem to be no columns in this set.");
+        [_parentDB postLogNotification:[NSString stringWithFormat:@"Warning: There seem to be no columns in this set."] line:__LINE__ function:__func__ logLevel:FMDBLogLevelWarn];
     }
     
     return nil;
@@ -143,7 +143,7 @@
         return dict;
     }
     else {
-        NSLog(@"Warning: There seem to be no columns in this set.");
+        [_parentDB postLogNotification:[NSString stringWithFormat:@"Warning: There seem to be no columns in this set."] line:__LINE__ function:__func__ logLevel:FMDBLogLevelWarn];
     }
     
     return nil;
@@ -161,8 +161,8 @@
     int rc = sqlite3_step([_statement statement]);
     
     if (SQLITE_BUSY == rc || SQLITE_LOCKED == rc) {
-        NSLog(@"%s:%d Database busy (%@)", __FUNCTION__, __LINE__, [_parentDB databasePath]);
-        NSLog(@"Database busy");
+        [_parentDB postLogNotification:[NSString stringWithFormat:@"%s:%d Database busy (%@)", __FUNCTION__, __LINE__, [_parentDB databasePath]] line:__LINE__ function:__func__ logLevel:FMDBLogLevelError];
+        [_parentDB postLogNotification:[NSString stringWithFormat:@"Database busy"] line:__LINE__ function:__func__ logLevel:FMDBLogLevelError];
         if (outErr) {
             *outErr = [_parentDB lastError];
         }
@@ -171,14 +171,14 @@
         // all is well, let's return.
     }
     else if (SQLITE_ERROR == rc) {
-        NSLog(@"Error calling sqlite3_step (%d: %s) rs", rc, sqlite3_errmsg([_parentDB sqliteHandle]));
+        [_parentDB postLogNotification:[NSString stringWithFormat:@"Error calling sqlite3_step (%d: %s) rs", rc, sqlite3_errmsg([_parentDB sqliteHandle])] line:__LINE__ function:__func__ logLevel:FMDBLogLevelError];
         if (outErr) {
             *outErr = [_parentDB lastError];
         }
     }
     else if (SQLITE_MISUSE == rc) {
         // uh oh.
-        NSLog(@"Error calling sqlite3_step (%d: %s) rs", rc, sqlite3_errmsg([_parentDB sqliteHandle]));
+        [_parentDB postLogNotification:[NSString stringWithFormat:@"Error calling sqlite3_step (%d: %s) rs", rc, sqlite3_errmsg([_parentDB sqliteHandle])] line:__LINE__ function:__func__ logLevel:FMDBLogLevelError];
         if (outErr) {
             if (_parentDB) {
                 *outErr = [_parentDB lastError];
@@ -194,7 +194,7 @@
     }
     else {
         // wtf?
-        NSLog(@"Unknown error calling sqlite3_step (%d: %s) rs", rc, sqlite3_errmsg([_parentDB sqliteHandle]));
+        [_parentDB postLogNotification:[NSString stringWithFormat:@"Unknown error calling sqlite3_step (%d: %s) rs", rc, sqlite3_errmsg([_parentDB sqliteHandle])] line:__LINE__ function:__func__ logLevel:FMDBLogLevelError];
         if (outErr) {
             *outErr = [_parentDB lastError];
         }
@@ -221,7 +221,7 @@
         return [n intValue];
     }
     
-    NSLog(@"Warning: I could not find the column named '%@'.", columnName);
+    [_parentDB postLogNotification:[NSString stringWithFormat:@"Warning: I could not find the column named '%@'.", columnName] line:__LINE__ function:__func__ logLevel:FMDBLogLevelWarn];
     
     return -1;
 }

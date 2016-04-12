@@ -69,6 +69,19 @@ typedef int(^FMDBExecuteStatementsCallbackBlock)(NSDictionary *resultsDictionary
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wobjc-interface-ivars"
 
+extern NSString *const FMDBLogNotification;
+extern NSString *const FMDBLogNotificationKeyLogLevel;
+extern NSString *const FMDBLogNotificationKeyMessage;
+extern NSString *const FMDBLogNotificationKeyFunctionName;
+extern NSString *const FMDBLogNotificationKeyLine;
+
+typedef NS_ENUM(NSInteger, FMDBLogLevel) {
+    FMDBLogLevelError,
+    FMDBLogLevelWarn,
+    FMDBLogLevelInfo,
+    FMDBLogLevelDEBUG,
+    FMDBLogLevelNone
+};
 
 @interface FMDatabase : NSObject  {
     
@@ -1099,6 +1112,8 @@ typedef int(^FMDBExecuteStatementsCallbackBlock)(NSDictionary *resultsDictionary
  */
 
 - (NSString *)stringFromDate:(NSDate *)date;
+
+- (void)postLogNotification:(NSString *)message line:(NSInteger)line function:(const char *)function logLevel:(FMDBLogLevel)level;
 
 @end
 

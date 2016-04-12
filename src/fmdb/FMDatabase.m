@@ -8,6 +8,12 @@
 #import <sqlite3.h>
 #endif
 
+NSString *const FMDBLogNotification                = @"FMDBLogNotification";
+NSString *const FMDBLogNotificationKeyLogLevel     = @"FMDBLogNotificationLogLevel";
+NSString *const FMDBLogNotificationKeyMessage      = @"FMDBLogNotificationMessage";
+NSString *const FMDBLogNotificationKeyFunctionName = @"FMDBLogNotificationFunction";
+NSString *const FMDBLogNotificationKeyLine         = @"FMDBLogNotificationLine";
+
 @interface FMDatabase ()
 
 - (FMResultSet *)executeQuery:(NSString *)sql withArgumentsInArray:(NSArray*)arrayArgs orDictionary:(NSDictionary *)dictionaryArgs orVAList:(va_list)args;
@@ -141,7 +147,7 @@
     
     int err = sqlite3_open([self sqlitePath], (sqlite3**)&_db );
     if(err != SQLITE_OK) {
-        NSLog(@"error opening!: %d", err);
+        [self postLogNotification:[NSString stringWithFormat:@"error opening!: %d", err] line:__LINE__ function:__func__ logLevel:FMDBLogLevelError];
         return NO;
     }
     
@@ -165,7 +171,7 @@
     
     int err = sqlite3_open_v2([self sqlitePath], (sqlite3**)&_db, flags, [vfsName UTF8String]);
     if(err != SQLITE_OK) {
-        NSLog(@"error opening!: %d", err);
+        [self postLogNotification:[NSString stringWithFormat:@"error opening!: %d", err] line:__LINE__ function:__func__ logLevel:FMDBLogLevelError];
         return NO;
     }
     
@@ -176,7 +182,7 @@
     
     return YES;
 #else
-    NSLog(@"openWithFlags requires SQLite 3.5");
+    [self postLogNotification:[NSString stringWithFormat:@"openWithFlags requires SQLite 3.5"] line:__LINE__ function:__func__ logLevel:FMDBLogLevelError];
     return NO;
 #endif
 }
@@ -203,14 +209,14 @@
                 triedFinalizingOpenStatements = YES;
                 sqlite3_stmt *pStmt;
                 while ((pStmt = sqlite3_next_stmt(_db, nil)) !=0) {
-                    NSLog(@"Closing leaked statement");
+                    [self postLogNotification:[NSString stringWithFormat:@"Closing leaked statement"] line:__LINE__ function:__func__ logLevel:FMDBLogLevelError];
                     sqlite3_finalize(pStmt);
                     retry = YES;
                 }
             }
         }
         else if (SQLITE_OK != rc) {
-            NSLog(@"error closing!: %d", rc);
+            [self postLogNotification:[NSString stringWithFormat:@"error closing!: %d", rc] line:__LINE__ function:__func__ logLevel:FMDBLogLevelError];
         }
     }
     while (retry);
@@ -245,7 +251,7 @@ static int FMDBDatabaseBusyHandler(void *f, int count) {
         int requestedSleepInMillseconds = (int) arc4random_uniform(50) + 50;
         int actualSleepInMilliseconds = sqlite3_sleep(requestedSleepInMillseconds);
         if (actualSleepInMilliseconds != requestedSleepInMillseconds) {
-            NSLog(@"WARNING: Requested sleep of %i milliseconds, but SQLite returned %i. Maybe SQLite wasn't built with HAVE_USLEEP=1?", requestedSleepInMillseconds, actualSleepInMilliseconds);
+            [self postLogNotification:[NSString stringWithFormat:@"WARNING: Requested sleep of %i milliseconds, but SQLite returned %i. Maybe SQLite wasn't built with HAVE_USLEEP=1?", requestedSleepInMillseconds, actualSleepInMilliseconds] line:__LINE__ function:__func__ logLevel:FMDBLogLevelError];
         }
         return 1;
     }
@@ -280,14 +286,14 @@ static int FMDBDatabaseBusyHandler(void *f, int count) {
 // we'll still implement the method so they don't get suprise crashes
 - (int)busyRetryTimeout {
     NSLog(@"%s:%d", __FUNCTION__, __LINE__);
-    NSLog(@"FMDB: busyRetryTimeout no longer works, please use maxBusyRetryTimeInterval");
+    [self postLogNotification:[NSString stringWithFormat:@"FMDB: busyRetryTimeout no longer works, please use maxBusyRetryTimeInterval"] line:__LINE__ function:__func__ logLevel:FMDBLogLevelWarn];
     return -1;
 }
 
 - (void)setBusyRetryTimeout:(int)i {
 #pragma unused(i)
     NSLog(@"%s:%d", __FUNCTION__, __LINE__);
-    NSLog(@"FMDB: setBusyRetryTimeout does nothing, please use setMaxBusyRetryTimeInterval:");
+    [self postLogNotification:[NSString stringWithFormat:@"FMDB: setBusyRetryTimeout does nothing, please use setMaxBusyRetryTimeInterval:"] line:__LINE__ function:__func__ logLevel:FMDBLogLevelWarn];
 }
 
 #pragma mark Result set functions
@@ -376,8 +382,8 @@ static int FMDBDatabaseBusyHandler(void *f, int count) {
     int rc = sqlite3_rekey(_db, [keyData bytes], (int)[keyData length]);
     
     if (rc != SQLITE_OK) {
-        NSLog(@"error on rekey: %d", rc);
-        NSLog(@"%@", [self lastErrorMessage]);
+        [self postLogNotification:[NSString stringWithFormat:@"error on rekey: %d", rc line:__LINE__ function:__func__];
+        [self postLogNotification:[NSString stringWithFormat:@"%@", [self lastErrorMessage] line:__LINE__ function:__func__];
     }
     
     return (rc == SQLITE_OK);
@@ -435,6 +441,16 @@ static int FMDBDatabaseBusyHandler(void *f, int count) {
 
 - (NSString *)stringFromDate:(NSDate *)date {
     return [_dateFormat stringFromDate:date];
+}
+
+- (void)postLogNotification:(NSString *)message line:(NSInteger)line function:(const char *)function logLevel:(FMDBLogLevel)level {
+    NSDictionary *dic = @{FMDBLogNotificationKeyLogLevel: @(level)
+                          , FMDBLogNotificationKeyFunctionName: [NSString stringWithFormat:@"%s", function]
+                          , FMDBLogNotificationKeyLine: @(line)
+                          , FMDBLogNotificationKeyMessage: message
+                          };
+    
+    [[NSNotificationCenter defaultCenter] postNotificationName:FMDBLogNotification object:dic];
 }
 
 #pragma mark State of database
@@ -778,9 +794,9 @@ static int FMDBDatabaseBusyHandler(void *f, int count) {
         
         if (SQLITE_OK != rc) {
             if (_logsErrors) {
-                NSLog(@"DB Error: %d \"%@\"", [self lastErrorCode], [self lastErrorMessage]);
-                NSLog(@"DB Query: %@", sql);
-                NSLog(@"DB Path: %@", _databasePath);
+                [self postLogNotification:[NSString stringWithFormat:@"DB Error: %d \"%@\"", [self lastErrorCode], [self lastErrorMessage]] line:__LINE__ function:__func__ logLevel:FMDBLogLevelError];
+                [self postLogNotification:[NSString stringWithFormat:@"DB Query: %@", sql] line:__LINE__ function:__func__ logLevel:FMDBLogLevelError];
+                [self postLogNotification:[NSString stringWithFormat:@"DB Path: %@", _databasePath] line:__LINE__ function:__func__ logLevel:FMDBLogLevelError];
             }
             
             if (_crashOnErrors) {
@@ -822,7 +838,7 @@ static int FMDBDatabaseBusyHandler(void *f, int count) {
                 idx++;
             }
             else {
-                NSLog(@"Could not find index for %@", dictionaryKey);
+                [self postLogNotification:[NSString stringWithFormat:@"Could not find index for %@", dictionaryKey] line:__LINE__ function:__func__ logLevel:FMDBLogLevelError];
             }
         }
     }
@@ -857,7 +873,7 @@ static int FMDBDatabaseBusyHandler(void *f, int count) {
     }
     
     if (idx != queryCount) {
-        NSLog(@"Error: the bind count is not correct for the # of variables (executeQuery)");
+        [self postLogNotification:[NSString stringWithFormat:@"Error: the bind count is not correct for the # of variables (executeQuery)"] line:__LINE__ function:__func__ logLevel:FMDBLogLevelError];
         sqlite3_finalize(pStmt);
         _isExecutingStatement = NO;
         return nil;
@@ -963,9 +979,9 @@ static int FMDBDatabaseBusyHandler(void *f, int count) {
         
         if (SQLITE_OK != rc) {
             if (_logsErrors) {
-                NSLog(@"DB Error: %d \"%@\"", [self lastErrorCode], [self lastErrorMessage]);
-                NSLog(@"DB Query: %@", sql);
-                NSLog(@"DB Path: %@", _databasePath);
+                [self postLogNotification:[NSString stringWithFormat:@"DB Error: %d \"%@\"", [self lastErrorCode], [self lastErrorMessage]] line:__LINE__ function:__func__ logLevel:FMDBLogLevelError];
+                [self postLogNotification:[NSString stringWithFormat:@"DB Query: %@", sql] line:__LINE__ function:__func__ logLevel:FMDBLogLevelError];
+                [self postLogNotification:[NSString stringWithFormat:@"DB Path: %@", _databasePath] line:__LINE__ function:__func__ logLevel:FMDBLogLevelError];
             }
             
             if (_crashOnErrors) {
@@ -1015,7 +1031,7 @@ static int FMDBDatabaseBusyHandler(void *f, int count) {
                 NSString *message = [NSString stringWithFormat:@"Could not find index for %@", dictionaryKey];
                 
                 if (_logsErrors) {
-                    NSLog(@"%@", message);
+                    [self postLogNotification:[NSString stringWithFormat:@"%@", message] line:__LINE__ function:__func__ logLevel:FMDBLogLevelError];
                 }
                 if (outErr) {
                     *outErr = [self errorWithMessage:message];
@@ -1057,7 +1073,7 @@ static int FMDBDatabaseBusyHandler(void *f, int count) {
     if (idx != queryCount) {
         NSString *message = [NSString stringWithFormat:@"Error: the bind count (%d) is not correct for the # of variables in the query (%d) (%@) (executeUpdate)", idx, queryCount, sql];
         if (_logsErrors) {
-            NSLog(@"%@", message);
+            [self postLogNotification:[NSString stringWithFormat:@"%@", message] line:__LINE__ function:__func__ logLevel:FMDBLogLevelError];
         }
         if (outErr) {
             *outErr = [self errorWithMessage:message];
@@ -1080,8 +1096,8 @@ static int FMDBDatabaseBusyHandler(void *f, int count) {
     else if (rc == SQLITE_ROW) {
         NSString *message = [NSString stringWithFormat:@"A executeUpdate is being called with a query string '%@'", sql];
         if (_logsErrors) {
-            NSLog(@"%@", message);
-            NSLog(@"DB Query: %@", sql);
+            [self postLogNotification:[NSString stringWithFormat:@"%@", message] line:__LINE__ function:__func__ logLevel:FMDBLogLevelError];
+            [self postLogNotification:[NSString stringWithFormat:@"DB Query: %@", sql] line:__LINE__ function:__func__ logLevel:FMDBLogLevelError];
         }
         if (outErr) {
             *outErr = [self errorWithMessage:message];
@@ -1094,22 +1110,22 @@ static int FMDBDatabaseBusyHandler(void *f, int count) {
         
         if (SQLITE_ERROR == rc) {
             if (_logsErrors) {
-                NSLog(@"Error calling sqlite3_step (%d: %s) SQLITE_ERROR", rc, sqlite3_errmsg(_db));
-                NSLog(@"DB Query: %@", sql);
+                [self postLogNotification:[NSString stringWithFormat:@"Error calling sqlite3_step (%d: %s) SQLITE_ERROR", rc, sqlite3_errmsg(_db)] line:__LINE__ function:__func__ logLevel:FMDBLogLevelError];
+                [self postLogNotification:[NSString stringWithFormat:@"DB Query: %@", sql] line:__LINE__ function:__func__ logLevel:FMDBLogLevelError];
             }
         }
         else if (SQLITE_MISUSE == rc) {
             // uh oh.
             if (_logsErrors) {
-                NSLog(@"Error calling sqlite3_step (%d: %s) SQLITE_MISUSE", rc, sqlite3_errmsg(_db));
-                NSLog(@"DB Query: %@", sql);
+                [self postLogNotification:[NSString stringWithFormat:@"Error calling sqlite3_step (%d: %s) SQLITE_MISUSE", rc, sqlite3_errmsg(_db)] line:__LINE__ function:__func__ logLevel:FMDBLogLevelError];
+                [self postLogNotification:[NSString stringWithFormat:@"DB Query: %@", sql] line:__LINE__ function:__func__ logLevel:FMDBLogLevelError];
             }
         }
         else {
             // wtf?
             if (_logsErrors) {
-                NSLog(@"Unknown error calling sqlite3_step (%d: %s) eu", rc, sqlite3_errmsg(_db));
-                NSLog(@"DB Query: %@", sql);
+                [self postLogNotification:[NSString stringWithFormat:@"Unknown error calling sqlite3_step (%d: %s) eu", rc, sqlite3_errmsg(_db)] line:__LINE__ function:__func__ logLevel:FMDBLogLevelError];
+                [self postLogNotification:[NSString stringWithFormat:@"DB Query: %@", sql] line:__LINE__ function:__func__ logLevel:FMDBLogLevelError];
             }
         }
     }
@@ -1139,8 +1155,11 @@ static int FMDBDatabaseBusyHandler(void *f, int count) {
     
     if (closeErrorCode != SQLITE_OK) {
         if (_logsErrors) {
-            NSLog(@"Unknown error finalizing or resetting statement (%d: %s)", closeErrorCode, sqlite3_errmsg(_db));
-            NSLog(@"DB Query: %@", sql);
+            [self postLogNotification:[NSString stringWithFormat:@"Unknown error finalizing or resetting statement (%d: %s)", closeErrorCode, sqlite3_errmsg(_db)]
+                                   line:__LINE__
+                               function:__func__
+                               logLevel:FMDBLogLevelError];
+            [self postLogNotification:[NSString stringWithFormat:@"DB Query: %@", sql] line:__LINE__ function:__func__ logLevel:FMDBLogLevelError];
         }
     }
     
@@ -1222,7 +1241,7 @@ int FMDBExecuteBulkSQLCallback(void *theBlockAsVoid, int columns, char **values,
     rc = sqlite3_exec([self sqliteHandle], [sql UTF8String], block ? FMDBExecuteBulkSQLCallback : nil, (__bridge void *)(block), &errmsg);
     
     if (errmsg && [self logsErrors]) {
-        NSLog(@"Error inserting batch: %s", errmsg);
+        [self postLogNotification:[NSString stringWithFormat:@"Error inserting batch: %s", errmsg] line:__LINE__ function:__func__ logLevel:FMDBLogLevelError];
         sqlite3_free(errmsg);
     }
     
@@ -1314,7 +1333,7 @@ static NSString *FMDBEscapeSavePointName(NSString *savepointName) {
     return [self executeUpdate:sql error:outErr withArgumentsInArray:nil orDictionary:nil orVAList:nil];
 #else
     NSString *errorMessage = NSLocalizedString(@"Save point functions require SQLite 3.7", nil);
-    if (self.logsErrors) NSLog(@"%@", errorMessage);
+    if (self.logsErrors) [self postLogNotification:[NSString stringWithFormat:@"%@", errorMessage);
     return NO;
 #endif
 }
@@ -1328,7 +1347,7 @@ static NSString *FMDBEscapeSavePointName(NSString *savepointName) {
     return [self executeUpdate:sql error:outErr withArgumentsInArray:nil orDictionary:nil orVAList:nil];
 #else
     NSString *errorMessage = NSLocalizedString(@"Save point functions require SQLite 3.7", nil);
-    if (self.logsErrors) NSLog(@"%@", errorMessage);
+    if (self.logsErrors) [self postLogNotification:[NSString stringWithFormat:@"%@", errorMessage);
     return NO;
 #endif
 }
@@ -1342,7 +1361,7 @@ static NSString *FMDBEscapeSavePointName(NSString *savepointName) {
     return [self executeUpdate:sql error:outErr withArgumentsInArray:nil orDictionary:nil orVAList:nil];
 #else
     NSString *errorMessage = NSLocalizedString(@"Save point functions require SQLite 3.7", nil);
-    if (self.logsErrors) NSLog(@"%@", errorMessage);
+    if (self.logsErrors) [self postLogNotification:[NSString stringWithFormat:@"%@", errorMessage);
     return NO;
 #endif
 }
@@ -1374,7 +1393,7 @@ static NSString *FMDBEscapeSavePointName(NSString *savepointName) {
     return err;
 #else
     NSString *errorMessage = NSLocalizedString(@"Save point functions require SQLite 3.7", nil);
-    if (self.logsErrors) NSLog(@"%@", errorMessage);
+    if (self.logsErrors) [self postLogNotification:[NSString stringWithFormat:@"%@", errorMessage);
     return [NSError errorWithDomain:@"FMDatabase" code:0 userInfo:@{NSLocalizedDescriptionKey : errorMessage}];
 #endif
 }
@@ -1475,7 +1494,6 @@ void FMDBBlockSQLiteCallBackFunction(sqlite3_context *context, int argc, sqlite3
 - (NSString*)description {
     return [NSString stringWithFormat:@"%@ %ld hit(s) for query %@", [super description], _useCount, _query];
 }
-
 
 @end
 
