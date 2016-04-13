@@ -73,7 +73,7 @@ static const void * const kDispatchQueueSpecificKey = &kDispatchQueueSpecificKey
         BOOL success = [_db open];
 #endif
         if (!success) {
-            [_db postLogNotification:[NSString stringWithFormat:@"Could not create database queue for path %@", aPath] line:__LINE__ function:__func__ logLevel:FMDBLogLevelError];
+            [_db postLogNotification:[NSString stringWithFormat:@"[DB]Could not create database queue for path %@", aPath] line:__LINE__ function:__func__ logLevel:FMDBLogLevelError];
             FMDBRelease(self);
             return 0x00;
         }
@@ -138,7 +138,7 @@ static const void * const kDispatchQueueSpecificKey = &kDispatchQueueSpecificKey
         BOOL success = [_db open];
 #endif
         if (!success) {
-            [_db postLogNotification:[NSString stringWithFormat:@"FMDatabaseQueue could not reopen database for path %@", _path] line:__LINE__ function:__func__ logLevel:FMDBLogLevelError];
+            [_db postLogNotification:[NSString stringWithFormat:@"[DB]FMDatabaseQueue could not reopen database for path %@", _path] line:__LINE__ function:__func__ logLevel:FMDBLogLevelError];
             FMDBRelease(_db);
             _db  = 0x00;
             return 0x00;
@@ -162,7 +162,7 @@ static const void * const kDispatchQueueSpecificKey = &kDispatchQueueSpecificKey
         block(db);
         
         if ([db hasOpenResultSets]) {
-            [db postLogNotification:[NSString stringWithFormat:@"Warning: there is at least one open result set around after performing [FMDatabaseQueue inDatabase:]"]
+            [db postLogNotification:[NSString stringWithFormat:@"[DB]Warning: there is at least one open result set around after performing [FMDatabaseQueue inDatabase:]"]
                                  line:__LINE__
                              function:__func__
                              logLevel:FMDBLogLevelWarn];
@@ -242,7 +242,7 @@ static const void * const kDispatchQueueSpecificKey = &kDispatchQueueSpecificKey
     return err;
 #else
     NSString *errorMessage = NSLocalizedString(@"Save point functions require SQLite 3.7", nil);
-    if (self.logsErrors) [db postLogNotification:[NSString stringWithFormat:@"%@", errorMessage] line:__LINE__ function:__func__];
+    if (self.logsErrors) [db postLogNotification:[NSString stringWithFormat:@"[DB]%@", errorMessage] line:__LINE__ function:__func__];
     return [NSError errorWithDomain:@"FMDatabase" code:0 userInfo:@{NSLocalizedDescriptionKey : errorMessage}];
 #endif
 }

@@ -79,7 +79,7 @@ typedef NS_ENUM(NSInteger, FMDBLogLevel) {
     FMDBLogLevelError,
     FMDBLogLevelWarn,
     FMDBLogLevelInfo,
-    FMDBLogLevelDEBUG,
+    FMDBLogLevelDebug,
     FMDBLogLevelNone
 };
 

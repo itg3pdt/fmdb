@@ -163,7 +163,7 @@
             }
         }
         else {
-            [db postLogNotification:[NSString stringWithFormat:@"Could not open up the database at path %@", self->_path] line:__LINE__ function:__func__ logLevel:FMDBLogLevelError];
+            [db postLogNotification:[NSString stringWithFormat:@"[DB]Could not open up the database at path %@", self->_path] line:__LINE__ function:__func__ logLevel:FMDBLogLevelError];
             db = 0x00;
         }
     }];
@@ -283,7 +283,7 @@
     return err;
 #else
     NSString *errorMessage = NSLocalizedString(@"Save point functions require SQLite 3.7", nil);
-    if (self.logsErrors) [self postLogNotification:[NSString stringWithFormat:@"%@", errorMessage);
+    if (self.logsErrors) [self postLogNotification:[NSString stringWithFormat:@"[DB]%@", errorMessage);
     return [NSError errorWithDomain:@"FMDatabase" code:0 userInfo:@{NSLocalizedDescriptionKey : errorMessage}];
 #endif
 }
