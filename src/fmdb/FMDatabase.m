@@ -14,6 +14,9 @@ NSString *const FMDBLogNotificationKeyMessage      = @"FMDBLogNotificationMessag
 NSString *const FMDBLogNotificationKeyFunctionName = @"FMDBLogNotificationFunction";
 NSString *const FMDBLogNotificationKeyLine         = @"FMDBLogNotificationLine";
 
+// sleep interval milliseconds
+#define kSleepTimeInterval 5
+
 @interface FMDatabase ()
 
 - (FMResultSet *)executeQuery:(NSString *)sql withArgumentsInArray:(NSArray*)arrayArgs orDictionary:(NSDictionary *)dictionaryArgs orVAList:(va_list)args;
@@ -248,7 +251,7 @@ static int FMDBDatabaseBusyHandler(void *f, int count) {
     NSTimeInterval delta = [NSDate timeIntervalSinceReferenceDate] - (self->_startBusyRetryTime);
     
     if (delta < [self maxBusyRetryTimeInterval]) {
-        int requestedSleepInMillseconds = (int) arc4random_uniform(50) + 50;
+        int requestedSleepInMillseconds = kSleepTimeInterval;
         int actualSleepInMilliseconds = sqlite3_sleep(requestedSleepInMillseconds);
         if (actualSleepInMilliseconds != requestedSleepInMillseconds) {
             [self postLogNotification:[NSString stringWithFormat:@"WARNING: Requested sleep of %i milliseconds, but SQLite returned %i. Maybe SQLite wasn't built with HAVE_USLEEP=1?", requestedSleepInMillseconds, actualSleepInMilliseconds] line:__LINE__ function:__func__ logLevel:FMDBLogLevelError];
